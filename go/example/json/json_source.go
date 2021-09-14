@@ -15,8 +15,8 @@
 package main
 
 import (
-	"fmt"
 	"github.com/lf-edge/ekuiper-plugin-sdk/api"
+	"github.com/lf-edge/ekuiper-plugin-sdk/context"
 	"time"
 )
 
@@ -62,7 +62,7 @@ func (s *jsonSource) Open(ctx api.StreamContext, consumer chan<- api.SourceTuple
 }
 
 func (s *jsonSource) Configure(dataSource string, config map[string]interface{}) error {
-	fmt.Printf("received datasource %s, config %+v", dataSource, config)
+	context.Log.Infof("received datasource %s, config %+v", dataSource, config)
 	return nil
 }
 

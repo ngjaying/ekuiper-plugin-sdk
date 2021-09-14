@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/lf-edge/ekuiper-plugin-server-sim/shared"
+	"github.com/lf-edge/ekuiper/pkg/api"
 	"io"
 	"os"
 	"os/exec"
@@ -34,11 +35,13 @@ var (
 // TODO timeout handling
 
 type pluginIns struct {
-	process  *os.Process
-	ctrlChan ControlChannel
+	process      *os.Process
+	ctrlChan     ControlChannel
+	runningCount int
+	name         string
 }
 
-func (i *pluginIns) StartSymbol(ctrl *shared.Control) error {
+func (i *pluginIns) StartSymbol(ctx api.StreamContext, ctrl *shared.Control) error {
 	arg, err := json.Marshal(ctrl)
 	if err != nil {
 		return err
@@ -51,10 +54,15 @@ func (i *pluginIns) StartSymbol(ctrl *shared.Control) error {
 	if err != nil {
 		return err
 	}
-	return i.ctrlChan.SendCmd(jsonArg)
+	err = i.ctrlChan.SendCmd(jsonArg)
+	if err == nil {
+		i.runningCount++
+		ctx.GetLogger().Infof("started symbol %s", ctrl.SymbolName)
+	}
+	return err
 }
 
-func (i *pluginIns) StopSymbol(ctrl *shared.Control) error {
+func (i *pluginIns) StopSymbol(ctx api.StreamContext, ctrl *shared.Control) error {
 	arg, err := json.Marshal(ctrl)
 	if err != nil {
 		return err
@@ -67,7 +75,24 @@ func (i *pluginIns) StopSymbol(ctrl *shared.Control) error {
 	if err != nil {
 		return err
 	}
-	return i.ctrlChan.SendCmd(jsonArg)
+	err = i.ctrlChan.SendCmd(jsonArg)
+	i.runningCount--
+	ctx.GetLogger().Infof("stopped symbol %s", ctrl.SymbolName)
+	if i.runningCount == 0 {
+		err := GetPluginInsManager().Kill(i.name)
+		if err != nil {
+			ctx.GetLogger().Infof("fail to stop plugin %s: %v", i.name, err)
+			return err
+		}
+		ctx.GetLogger().Infof("stop plugin %s", i.name)
+	}
+	return err
+}
+
+func (i *pluginIns) Stop() error {
+	i.ctrlChan.Close()
+	err := i.process.Kill()
+	return err
 }
 
 // Manager plugin process and control socket
@@ -156,6 +181,7 @@ func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin) (*pluginIns, er
 	}
 
 	ins := &pluginIns{
+		name:     pluginMeta.Name,
 		process:  process,
 		ctrlChan: ctrlChan,
 	}
@@ -164,10 +190,24 @@ func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin) (*pluginIns, er
 	return ins, nil
 }
 
+func (p *pluginInsManager) Kill(name string) error {
+	p.Lock()
+	defer p.Unlock()
+	var err error
+	if ins, ok := p.instances[name]; ok {
+		err = ins.Stop()
+		delete(p.instances, name)
+	} else {
+		return fmt.Errorf("instance %s not found", name)
+	}
+	return err
+}
+
 func (p *pluginInsManager) KillAll() error {
+	p.Lock()
+	defer p.Unlock()
 	for _, ins := range p.instances {
-		ins.ctrlChan.Close()
-		ins.process.Kill()
+		ins.Stop()
 	}
 	p.instances = make(map[string]*pluginIns)
 	return nil

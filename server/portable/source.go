@@ -74,12 +74,12 @@ func (ps *PortableSource) Open(ctx api.StreamContext, consumer chan<- api.Source
 		DataSource: ps.topic,
 		Config:     ps.props,
 	}
-	err = ins.StartSymbol(c)
+	err = ins.StartSymbol(ctx, c)
 	if err != nil {
 		errCh <- err
 		return
 	}
-	defer ins.StopSymbol(c)
+	defer ins.StopSymbol(ctx, c)
 
 	for {
 		var msg []byte

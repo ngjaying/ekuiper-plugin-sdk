@@ -62,11 +62,12 @@ outer:
 		case <-ticker:
 			portable.Logger.Info("stop after timeout")
 			cancel()
-			time.Sleep(1 * time.Minute)
 			break outer
 		}
 	}
 
+	time.Sleep(20 * time.Second)
 	pm := portable.GetPluginInsManager()
 	pm.KillAll()
+
 }

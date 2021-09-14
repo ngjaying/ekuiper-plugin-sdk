@@ -23,7 +23,10 @@ import (
 	"github.com/lf-edge/ekuiper-plugin-sdk/connection"
 	"github.com/lf-edge/ekuiper-plugin-sdk/context"
 	"github.com/lf-edge/ekuiper-plugin-sdk/shared"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 )
 
 var (
@@ -74,61 +77,69 @@ func Start(_ []string, conf *PluginConfig) {
 	if err != nil {
 		panic(err)
 	}
-	logger.Info("running control channel")
-	err = ch.Run(func(req []byte) []byte { // not parallel run now
-		c := &shared.Command{}
-		err := json.Unmarshal(req, c)
-		if err != nil {
-			return []byte(err.Error())
-		}
-		logger.Infof("received command %s with arg:'%s'", c.Cmd, c.Arg)
-		ctrl := &shared.Control{}
-		err = json.Unmarshal(c.Arg, ctrl)
-		if err != nil {
-			return []byte(err.Error())
-		}
-		regKey := fmt.Sprintf("%s_%s_%d_%s", ctrl.Meta.RuleId, ctrl.Meta.OpId, ctrl.Meta.InstanceId, ctrl.SymbolName)
-		switch c.Cmd {
-		case shared.CMD_START:
-			pt, f := conf.Get(ctrl.SymbolName)
-			switch pt {
-			case TYPE_SOURCE:
-				sf := f.(NewSourceFunc)
-				sr, err := setupSourceRuntime(ctrl, sf())
-				if err != nil {
-					return []byte(err.Error())
+	go func() {
+		logger.Info("running control channel")
+		err = ch.Run(func(req []byte) []byte { // not parallel run now
+			c := &shared.Command{}
+			err := json.Unmarshal(req, c)
+			if err != nil {
+				return []byte(err.Error())
+			}
+			logger.Infof("received command %s with arg:'%s'", c.Cmd, c.Arg)
+			ctrl := &shared.Control{}
+			err = json.Unmarshal(c.Arg, ctrl)
+			if err != nil {
+				return []byte(err.Error())
+			}
+			regKey := fmt.Sprintf("%s_%s_%d_%s", ctrl.Meta.RuleId, ctrl.Meta.OpId, ctrl.Meta.InstanceId, ctrl.SymbolName)
+			switch c.Cmd {
+			case shared.CMD_START:
+				pt, f := conf.Get(ctrl.SymbolName)
+				switch pt {
+				case TYPE_SOURCE:
+					sf := f.(NewSourceFunc)
+					sr, err := setupSourceRuntime(ctrl, sf())
+					if err != nil {
+						return []byte(err.Error())
+					}
+					// TODO need to know how many are running
+					go sr.run()
+					reg.Set(regKey, sr)
+					logger.Infof("running source %s", ctrl.SymbolName)
+				case TYPE_SINK:
+				case TYPE_FUNC:
+				default:
+					return []byte("symbol not found")
 				}
-				// TODO need to know how many are running
-				go sr.run()
-				reg.Set(regKey, sr)
-				logger.Infof("running source %s", ctrl.SymbolName)
-			case TYPE_SINK:
-			case TYPE_FUNC:
+				return []byte(shared.REPLY_OK)
+			case shared.CMD_STOP:
+				logger.Infof("stopping %s", regKey)
+				runtime, ok := reg.Get(regKey)
+				if !ok {
+					return []byte(fmt.Sprintf("symbol %s not found", regKey))
+				}
+				if runtime.isRunning() {
+					err = runtime.stop()
+					if err != nil {
+						return []byte(err.Error())
+					}
+				}
+				return []byte(shared.REPLY_OK)
 			default:
-				return []byte("symbol not found")
+				return []byte(fmt.Sprintf("invalid command received: %s", c.Cmd))
 			}
-			return []byte(shared.REPLY_OK)
-		case shared.CMD_STOP:
-			logger.Infof("stopping %s", regKey)
-			runtime, ok := reg.Get(regKey)
-			if !ok {
-				return []byte(fmt.Sprintf("symbol %s not found", regKey))
-			}
-			if runtime.isRunning() {
-				err = runtime.stop()
-				if err != nil {
-					return []byte(err.Error())
-				}
-			}
-			return []byte(shared.REPLY_OK)
-		default:
-			return []byte(fmt.Sprintf("invalid command received: %s", c.Cmd))
+		})
+		if err != nil {
+			logger.Error(err)
 		}
-	})
-	if err != nil {
-		logger.Error(err)
-	}
-	logger.Info("Stopping plugin")
+		os.Exit(1)
+	}()
+	//Stop the whole plugin
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	<-sigint
+	logger.Infof("stopping plugin %s", conf.Name)
+	os.Exit(0)
 }
 
 // key is rule_op_ins_symbol
