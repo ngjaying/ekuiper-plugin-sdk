@@ -16,9 +16,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/lf-edge/ekuiper-plugin-sdk"
 	"github.com/lf-edge/ekuiper-plugin-sdk/api"
-	"os"
 	"time"
 )
 
@@ -40,10 +38,10 @@ var data = []map[string]interface{}{
 	},
 }
 
-type json struct {
+type jsonSource struct {
 }
 
-func (s *json) Open(ctx api.StreamContext, consumer chan<- api.SourceTuple, _ chan<- error) {
+func (s *jsonSource) Open(ctx api.StreamContext, consumer chan<- api.SourceTuple, _ chan<- error) {
 	ctx.GetLogger().Infof("Start json source for rule %s", ctx.GetRuleId())
 	ticker := time.NewTicker(1 * time.Second)
 	c := 0
@@ -61,18 +59,15 @@ func (s *json) Open(ctx api.StreamContext, consumer chan<- api.SourceTuple, _ ch
 	}
 }
 
-func (s *json) Configure(dataSource string, config map[string]interface{}) error {
+func (s *jsonSource) Configure(dataSource string, config map[string]interface{}) error {
 	fmt.Printf("received datasource %s, config %+v", dataSource, config)
 	return nil
 }
 
-func (s *json) Close(ctx api.StreamContext) error {
+func (s *jsonSource) Close(ctx api.StreamContext) error {
 	ctx.GetLogger().Infof("Closing json source")
 	return nil
 }
 
 // TODO is this eliminatable?
 // arg "{\"meta\":{\"ruleId\":\"rule1\",\"opId\":\"op1\",\"instanceId\":0},\"dataSource\":\"hello\",\"config\":{\"a\":1}}"
-func main() {
-	sdk.Start(os.Args, &json{})
-}

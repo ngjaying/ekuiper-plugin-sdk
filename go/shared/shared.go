@@ -12,29 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sdk
+package shared
 
-import (
-	"encoding/json"
-)
-
-type meta struct {
+type Meta struct {
 	RuleId     string `json:"ruleId"`
 	OpId       string `json:"opId"`
 	InstanceId int    `json:"instanceId"`
 }
 
-type control struct {
-	Meta       *meta                  `json:"meta,omitempty"`
+type Control struct {
+	SymbolName string                 `json:"symbolName"`
+	Meta       *Meta                  `json:"meta,omitempty"`
 	DataSource string                 `json:"dataSource,omitempty"`
 	Config     map[string]interface{} `json:"config,omitempty"`
 }
 
-func parse(jsonStr string) (*control, error) {
-	c := &control{}
-	err := json.Unmarshal([]byte(jsonStr), &c)
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
+type Command struct {
+	Cmd string `json:"cmd"`
+	Arg []byte `json:"arg"`
 }
+
+const (
+	CMD_START = "start"
+	CMD_STOP  = "stop"
+)
+
+const (
+	REPLY_OK = "ok"
+)

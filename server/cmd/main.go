@@ -12,113 +12,58 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Manage two layers: cmd process & sockets. Each plugin needs a socket, a bunch of plugin only need a process.
+
 package main
 
 import (
-	"bufio"
-	"fmt"
-	"go.nanomsg.org/mangos/v3"
-	"go.nanomsg.org/mangos/v3/protocol/pair"
-	_ "go.nanomsg.org/mangos/v3/transport/all"
+	"context"
+	"github.com/lf-edge/ekuiper-plugin-server-sim/portable"
+	"github.com/lf-edge/ekuiper/pkg/api"
 	"log"
-	"os/exec"
+	"time"
 )
 
 const (
-	url     = "ipc:///tmp/rule1_op1.ipc"
-	jsonArg = "{\"meta\":{\"ruleId\":\"rule1\",\"opId\":\"op1\",\"instanceId\":0},\"dataSource\":\"hello\",\"config\":{\"a\":1}}"
-	//lang = "go"
-	//exe = "../go/bin/json.exe"
-	lang = "python"
-	exe  = "../python/pyjson.py"
+	lang = "go"
+	exe  = "../go/bin/json.exe"
+	//lang = "python"
+	//exe  = "../python/pyjson.py"
 )
 
 func main() {
-	sock := listen()
-	go runPortable(lang, exe, jsonArg)
+	sm := &portable.SourceMetadata{
+		RuleId:     "rule1",
+		OpId:       "op1",
+		PluginName: "json",
+		PluginType: "source",
+		SymbolName: "json",
+		Lang:       lang,
+		Exe:        exe,
+	}
+	s := portable.NewPortableSource("json", sm)
+	ctx, cancel := (&portable.MockContext{
+		Meta: sm,
+		Ctx:  context.Background(),
+	}).WithCancel()
+	consumer := make(chan api.SourceTuple)
+	errCh := make(chan error)
+	go s.Open(ctx, consumer, errCh)
+
+	ticker := time.After(2 * time.Minute)
+
 	for {
-		var msg []byte
-		// TODO set timeout
-		msg, err := sock.Recv()
-		if err != nil {
-			panic(fmt.Errorf("cannot receive from mangos Socket: %s", err.Error()))
-			return
+		select {
+		case err := <-errCh:
+			log.Printf("received error: %v\n", err)
+			cancel()
+		case tuple := <-consumer:
+			log.Printf("received tuple: %v\n", tuple)
+		case <-ticker:
+			log.Print("stop after timeout\n")
+			cancel()
+			time.Sleep(20 * time.Second)
+			break
 		}
-		fmt.Println(string(msg))
 	}
-}
-
-func runPortable(language string, exe string, jsonArg string) {
-	log.Println("executing plugin")
-	var cmd *exec.Cmd
-	switch language {
-	case "go":
-		log.Println("starting plugin executable %s with args %s", exe, jsonArg)
-		cmd = exec.Command(exe, jsonArg)
-
-	case "python":
-		log.Println("starting python plugin executable %s with args %s", exe, jsonArg)
-		cmd = exec.Command("python", exe, jsonArg)
-	default:
-		log.Printf("unsupported language: %s\n", language)
-		return
-	}
-	cmdStdout, err := cmd.StdoutPipe()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	go func() {
-		scanner := bufio.NewScanner(cmdStdout)
-		for scanner.Scan() {
-			log.Printf("plugin log: %s\n", scanner.Text())
-		}
-	}()
-	cmdStderr, err := cmd.StderrPipe()
-	go func() {
-		scanner := bufio.NewScanner(cmdStderr)
-		for scanner.Scan() {
-			log.Printf("plugin error: %s\n", scanner.Text())
-		}
-	}()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	go func() {
-		log.Println("plugin starting")
-		err := cmd.Run()
-		if err != nil {
-			log.Printf("plugin executable %s stops with error %v\n", exe, err)
-			return
-		}
-		process := cmd.Process
-		log.Printf("plugin started pid: %d\n", process.Pid)
-
-		defer func() {
-			r := recover()
-
-			if err != nil || r != nil {
-				cmd.Process.Kill()
-			}
-
-			if r != nil {
-				panic(r)
-			}
-		}()
-	}()
-}
-
-func listen() mangos.Socket {
-	var (
-		sock mangos.Socket
-		err  error
-	)
-	if sock, err = pair.NewSocket(); err != nil {
-		panic(fmt.Errorf("can't get new pull socket: %s", err))
-	}
-	if err = sock.Listen(url); err != nil {
-		panic(fmt.Errorf("can't listen on pull socket for %s: %s", url, err.Error()))
-	}
-	return sock
 }
