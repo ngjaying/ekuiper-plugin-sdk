@@ -49,20 +49,24 @@ func main() {
 	errCh := make(chan error)
 	go s.Open(ctx, consumer, errCh)
 
-	ticker := time.After(2 * time.Minute)
+	ticker := time.After(10 * time.Second)
 
+outer:
 	for {
 		select {
 		case err := <-errCh:
-			portable.Logger.Printf("received error: %v\n", err)
+			portable.Logger.Infof("received error: %v", err)
 			cancel()
 		case tuple := <-consumer:
-			portable.Logger.Printf("received tuple: %v\n", tuple)
+			portable.Logger.Infof("received tuple: %v", tuple)
 		case <-ticker:
-			portable.Logger.Print("stop after timeout\n")
+			portable.Logger.Info("stop after timeout")
 			cancel()
-			time.Sleep(20 * time.Second)
-			break
+			time.Sleep(1 * time.Minute)
+			break outer
 		}
 	}
+
+	pm := portable.GetPluginInsManager()
+	pm.KillAll()
 }

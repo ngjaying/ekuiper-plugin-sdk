@@ -26,11 +26,21 @@ import (
 	"github.com/lf-edge/ekuiper-plugin-sdk/shared"
 )
 
+type RuntimeInstance interface {
+	run()
+	stop() error
+	isRunning() bool
+}
+
+// lifecycle controlled by plugin
+// if stop by error, inform plugin
+
 type sourceRuntime struct {
 	s      api.Source
 	ch     connection.DataOutChannel
 	ctx    api.StreamContext
 	cancel context2.CancelFunc
+	key    string
 }
 
 func setupSourceRuntime(con *shared.Control, s api.Source) (*sourceRuntime, error) {
@@ -57,15 +67,11 @@ func setupSourceRuntime(con *shared.Control, s api.Source) (*sourceRuntime, erro
 		ch:     ch,
 		ctx:    ctx,
 		cancel: cancel,
+		key:    fmt.Sprintf("%s_%s_%d_%s", con.Meta.RuleId, con.Meta.OpId, con.Meta.InstanceId, con.SymbolName),
 	}, nil
 }
 
 func (s *sourceRuntime) run() {
-	defer func() {
-		s.cancel()
-		s.ch.Close()
-		closeSource(s.ctx)
-	}()
 	errCh := make(chan error)
 	consumer := make(chan api.SourceTuple)
 	go s.s.Open(s.ctx, consumer, errCh)
@@ -74,16 +80,26 @@ func (s *sourceRuntime) run() {
 		case err := <-errCh:
 			s.ctx.GetLogger().Errorf("%v", err)
 			broadcast(s.ctx, s.ch, err)
-			break
+			s.stop()
 		case data := <-consumer:
 			s.ctx.GetLogger().Debugf("broadcast data %v", data)
 			broadcast(s.ctx, s.ch, data)
+		case <-s.ctx.Done():
+			s.s.Close(s.ctx)
+			return
 		}
 	}
 }
 
-func closeSource(ctx api.StreamContext) error {
+func (s *sourceRuntime) stop() error {
+	s.cancel()
+	s.ch.Close()
+	reg.Delete(s.key)
 	return nil
+}
+
+func (s *sourceRuntime) isRunning() bool {
+	return s.ctx.Err() == nil
 }
 
 func parseContext(con *shared.Control) (api.StreamContext, error) {

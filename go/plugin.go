@@ -23,9 +23,21 @@ import (
 	"github.com/lf-edge/ekuiper-plugin-sdk/connection"
 	"github.com/lf-edge/ekuiper-plugin-sdk/context"
 	"github.com/lf-edge/ekuiper-plugin-sdk/shared"
+	"sync"
 )
 
-var logger api.Logger
+var (
+	logger api.Logger
+	reg    runtimes
+)
+
+func initVars(conf *PluginConfig) {
+	logger = context.LogEntry("plugin", conf.Name)
+	reg = runtimes{
+		content: make(map[string]RuntimeInstance),
+		RWMutex: sync.RWMutex{},
+	}
+}
 
 type NewSourceFunc func() api.Source
 
@@ -56,7 +68,7 @@ func (conf *PluginConfig) Get(symbolName string) (pluginType string, builderFunc
 // Only run once at process startup
 // TODO parse configuration like debug mode
 func Start(_ []string, conf *PluginConfig) {
-	logger = context.LogEntry("plugin", conf.Name)
+	initVars(conf)
 	logger.Info("starting plugin, creating control channel")
 	ch, err := connection.CreateControlChannel(conf.Name)
 	if err != nil {
@@ -70,13 +82,14 @@ func Start(_ []string, conf *PluginConfig) {
 			return []byte(err.Error())
 		}
 		logger.Infof("received command %s with arg:'%s'", c.Cmd, c.Arg)
+		ctrl := &shared.Control{}
+		err = json.Unmarshal(c.Arg, ctrl)
+		if err != nil {
+			return []byte(err.Error())
+		}
+		regKey := fmt.Sprintf("%s_%s_%d_%s", ctrl.Meta.RuleId, ctrl.Meta.OpId, ctrl.Meta.InstanceId, ctrl.SymbolName)
 		switch c.Cmd {
 		case shared.CMD_START:
-			ctrl := &shared.Control{}
-			err = json.Unmarshal(c.Arg, ctrl)
-			if err != nil {
-				return []byte(err.Error())
-			}
 			pt, f := conf.Get(ctrl.SymbolName)
 			switch pt {
 			case TYPE_SOURCE:
@@ -87,6 +100,7 @@ func Start(_ []string, conf *PluginConfig) {
 				}
 				// TODO need to know how many are running
 				go sr.run()
+				reg.Set(regKey, sr)
 				logger.Infof("running source %s", ctrl.SymbolName)
 			case TYPE_SINK:
 			case TYPE_FUNC:
@@ -95,6 +109,17 @@ func Start(_ []string, conf *PluginConfig) {
 			}
 			return []byte(shared.REPLY_OK)
 		case shared.CMD_STOP:
+			logger.Infof("stopping %s", regKey)
+			runtime, ok := reg.Get(regKey)
+			if !ok {
+				return []byte(fmt.Sprintf("symbol %s not found", regKey))
+			}
+			if runtime.isRunning() {
+				err = runtime.stop()
+				if err != nil {
+					return []byte(err.Error())
+				}
+			}
 			return []byte(shared.REPLY_OK)
 		default:
 			return []byte(fmt.Sprintf("invalid command received: %s", c.Cmd))
@@ -104,4 +129,29 @@ func Start(_ []string, conf *PluginConfig) {
 		logger.Error(err)
 	}
 	logger.Info("Stopping plugin")
+}
+
+// key is rule_op_ins_symbol
+type runtimes struct {
+	content map[string]RuntimeInstance
+	sync.RWMutex
+}
+
+func (r *runtimes) Set(name string, instance RuntimeInstance) {
+	r.Lock()
+	defer r.Unlock()
+	r.content[name] = instance
+}
+
+func (r *runtimes) Get(name string) (RuntimeInstance, bool) {
+	r.RLock()
+	defer r.RUnlock()
+	result, ok := r.content[name]
+	return result, ok
+}
+
+func (r *runtimes) Delete(name string) {
+	r.Lock()
+	defer r.Unlock()
+	delete(r.content, name)
 }

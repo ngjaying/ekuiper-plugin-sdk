@@ -54,10 +54,14 @@ func (i *pluginIns) StartSymbol(ctrl *shared.Control) error {
 	return i.ctrlChan.SendCmd(jsonArg)
 }
 
-func (i *pluginIns) StopSymbol(symbol string) error {
+func (i *pluginIns) StopSymbol(ctrl *shared.Control) error {
+	arg, err := json.Marshal(ctrl)
+	if err != nil {
+		return err
+	}
 	c := shared.Command{
 		Cmd: shared.CMD_STOP,
-		Arg: []byte(symbol),
+		Arg: arg,
 	}
 	jsonArg, err := json.Marshal(c)
 	if err != nil {
@@ -128,14 +132,14 @@ func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin) (*pluginIns, er
 	Logger.Println("plugin starting")
 	err = cmd.Start()
 	if err != nil {
-		return nil, fmt.Errorf("plugin executable %s stops with error %v\n", pluginMeta.Executable, err)
+		return nil, fmt.Errorf("plugin executable %s stops with error %v", pluginMeta.Executable, err)
 	}
 	process := cmd.Process
 	Logger.Printf("plugin started pid: %d\n", process.Pid)
 	go func() {
 		err = cmd.Wait()
 		if err != nil {
-			Logger.Printf("plugin executable %s stops with error %v\n", pluginMeta.Executable, err)
+			Logger.Printf("plugin executable %s stops with error %v", pluginMeta.Executable, err)
 		}
 		p.Lock()
 		defer p.Unlock()
@@ -160,10 +164,20 @@ func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin) (*pluginIns, er
 	return ins, nil
 }
 
+func (p *pluginInsManager) KillAll() error {
+	for _, ins := range p.instances {
+		ins.ctrlChan.Close()
+		ins.process.Kill()
+	}
+	p.instances = make(map[string]*pluginIns)
+	return nil
+}
+
 // ends when the plugin process end, we will receive EOF
 func logging(r io.Reader) {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		fmt.Printf("plugin log: %s\n", scanner.Text())
 	}
+	Logger.Println("stop plugin logging")
 }

@@ -79,7 +79,7 @@ func (ps *PortableSource) Open(ctx api.StreamContext, consumer chan<- api.Source
 		errCh <- err
 		return
 	}
-	defer ins.StopSymbol(ps.reg.SymbolName)
+	defer ins.StopSymbol(c)
 
 	for {
 		var msg []byte
@@ -98,7 +98,7 @@ func (ps *PortableSource) Open(ctx api.StreamContext, consumer chan<- api.Source
 		case consumer <- api.NewDefaultSourceTuple(result, nil):
 			ctx.GetLogger().Debugf("send data to source node")
 		case <-ctx.Done():
-			ctx.GetLogger().Info("Closing plugin socket")
+			ctx.GetLogger().Info("stop source")
 			return
 		}
 	}

@@ -42,12 +42,6 @@ type jsonSource struct {
 }
 
 func (s *jsonSource) Open(ctx api.StreamContext, consumer chan<- api.SourceTuple, _ chan<- error) {
-	if ctx == nil {
-		fmt.Println("context is nil")
-	}
-	if ctx.GetLogger() == nil {
-		fmt.Println("context logger is nil")
-	}
 	ctx.GetLogger().Infof("Start json source for rule %s", ctx.GetRuleId())
 	ticker := time.NewTicker(1 * time.Second)
 	c := 0
@@ -58,9 +52,11 @@ func (s *jsonSource) Open(ctx api.StreamContext, consumer chan<- api.SourceTuple
 			case consumer <- api.NewDefaultSourceTuple(data[c], nil):
 				c = (c + 1) % len(data)
 			case <-ctx.Done():
+				return
 			}
 		case <-ctx.Done():
 			ticker.Stop()
+			return
 		}
 	}
 }
