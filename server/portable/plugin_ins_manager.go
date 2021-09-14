@@ -15,12 +15,10 @@
 package portable
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"github.com/lf-edge/ekuiper-plugin-server-sim/shared"
 	"github.com/lf-edge/ekuiper/pkg/api"
-	"io"
 	"os"
 	"os/exec"
 	"sync"
@@ -143,16 +141,8 @@ func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin) (*pluginIns, er
 	default:
 		return nil, fmt.Errorf("unsupported language: %s\n", pluginMeta.Language)
 	}
-	cmdStdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	go logging(cmdStdout)
-	cmdStderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, err
-	}
-	go logging(cmdStderr)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	Logger.Println("plugin starting")
 	err = cmd.Start()
@@ -211,13 +201,4 @@ func (p *pluginInsManager) KillAll() error {
 	}
 	p.instances = make(map[string]*pluginIns)
 	return nil
-}
-
-// ends when the plugin process end, we will receive EOF
-func logging(r io.Reader) {
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		fmt.Printf("plugin log: %s\n", scanner.Text())
-	}
-	Logger.Println("stop plugin logging")
 }
