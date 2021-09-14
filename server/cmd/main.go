@@ -20,7 +20,6 @@ import (
 	"context"
 	"github.com/lf-edge/ekuiper-plugin-server-sim/portable"
 	"github.com/lf-edge/ekuiper/pkg/api"
-	"log"
 	"time"
 )
 
@@ -55,12 +54,12 @@ func main() {
 	for {
 		select {
 		case err := <-errCh:
-			log.Printf("received error: %v\n", err)
+			portable.Logger.Printf("received error: %v\n", err)
 			cancel()
 		case tuple := <-consumer:
-			log.Printf("received tuple: %v\n", tuple)
+			portable.Logger.Printf("received tuple: %v\n", tuple)
 		case <-ticker:
-			log.Print("stop after timeout\n")
+			portable.Logger.Print("stop after timeout\n")
 			cancel()
 			time.Sleep(20 * time.Second)
 			break

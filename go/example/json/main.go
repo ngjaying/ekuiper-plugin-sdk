@@ -15,14 +15,12 @@
 package main
 
 import (
-	"fmt"
 	sdk "github.com/lf-edge/ekuiper-plugin-sdk"
 	"github.com/lf-edge/ekuiper-plugin-sdk/api"
 	"os"
 )
 
 func main() {
-	fmt.Println("running plugin")
 	sdk.Start(os.Args, &sdk.PluginConfig{
 		Name: "json",
 		Sources: map[string]sdk.NewSourceFunc{

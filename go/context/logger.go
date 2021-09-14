@@ -18,34 +18,25 @@ import (
 	filename "github.com/keepeye/logrus-filename"
 	"github.com/lf-edge/ekuiper-plugin-sdk/api"
 	"github.com/sirupsen/logrus"
-	"os"
-)
-
-const (
-	logFileName = "stream.log"
 )
 
 var (
-	Log     *logrus.Logger
-	logFile *os.File
+	Log *logrus.Logger
 )
 
-func InitLogger() api.Logger {
+func init() {
 	Log = logrus.New()
 	filenameHook := filename.NewHook()
 	filenameHook.Field = "file"
 	Log.AddHook(filenameHook)
-
 	Log.SetFormatter(&logrus.TextFormatter{
 		TimestampFormat: "2006-01-02 15:04:05",
 		DisableColors:   true,
 		FullTimestamp:   true,
 	})
-	return Log
+	Log.WithField("type", "plugin")
 }
 
-func CloseLogger() {
-	if logFile != nil {
-		logFile.Close()
-	}
+func LogEntry(key string, value interface{}) api.Logger {
+	return Log.WithField(key, value)
 }

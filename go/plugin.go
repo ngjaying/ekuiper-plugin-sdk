@@ -21,8 +21,11 @@ import (
 	"fmt"
 	"github.com/lf-edge/ekuiper-plugin-sdk/api"
 	"github.com/lf-edge/ekuiper-plugin-sdk/connection"
+	"github.com/lf-edge/ekuiper-plugin-sdk/context"
 	"github.com/lf-edge/ekuiper-plugin-sdk/shared"
 )
+
+var logger api.Logger
 
 type NewSourceFunc func() api.Source
 
@@ -51,19 +54,22 @@ func (conf *PluginConfig) Get(symbolName string) (pluginType string, builderFunc
 
 // Start Connect to control plane
 // Only run once at process startup
+// TODO parse configuration like debug mode
 func Start(_ []string, conf *PluginConfig) {
-	fmt.Println("creating control channel")
+	logger = context.LogEntry("plugin", conf.Name)
+	logger.Info("starting plugin, creating control channel")
 	ch, err := connection.CreateControlChannel(conf.Name)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("running control channel")
+	logger.Info("running control channel")
 	err = ch.Run(func(req []byte) []byte { // not parallel run now
 		c := &shared.Command{}
 		err := json.Unmarshal(req, c)
 		if err != nil {
 			return []byte(err.Error())
 		}
+		logger.Infof("received command %s with arg:'%s'", c.Cmd, c.Arg)
 		switch c.Cmd {
 		case shared.CMD_START:
 			ctrl := &shared.Control{}
@@ -81,10 +87,11 @@ func Start(_ []string, conf *PluginConfig) {
 				}
 				// TODO need to know how many are running
 				go sr.run()
+				logger.Infof("running source %s", ctrl.SymbolName)
 			case TYPE_SINK:
 			case TYPE_FUNC:
 			default:
-				return []byte(shared.REPLY_OK)
+				return []byte("symbol not found")
 			}
 			return []byte(shared.REPLY_OK)
 		case shared.CMD_STOP:
@@ -94,6 +101,7 @@ func Start(_ []string, conf *PluginConfig) {
 		}
 	})
 	if err != nil {
-		fmt.Println(err)
+		logger.Error(err)
 	}
+	logger.Info("Stopping plugin")
 }

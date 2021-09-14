@@ -32,6 +32,7 @@ type DefaultContext struct {
 	ctx        context.Context
 	err        error
 	//Only initialized after withMeta set
+	logger   api.Logger
 	store    api.Store
 	state    *sync.Map
 	snapshot map[string]interface{}
@@ -79,7 +80,7 @@ func (c *DefaultContext) GetLogger() api.Logger {
 	if l != nil && ok {
 		return l
 	}
-	return Log.WithField("caller", "default")
+	return LogEntry("rule", c.ruleId)
 }
 
 func (c *DefaultContext) GetRuleId() string {

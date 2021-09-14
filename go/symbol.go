@@ -87,14 +87,14 @@ func closeSource(ctx api.StreamContext) error {
 }
 
 func parseContext(con *shared.Control) (api.StreamContext, error) {
-	contextLogger := context.InitLogger()
-	c := context.WithValue(context.Background(), context.LoggerKey, contextLogger)
 	if con.Meta.RuleId == "" || con.Meta.OpId == "" {
 		err := fmt.Sprintf("invalid arg %v, ruleId and opId are required", con)
-		contextLogger.Errorf(err)
+		context.Log.Errorf(err)
 		return nil, fmt.Errorf(err)
 	}
-	return c.WithMeta(con.Meta.RuleId, con.Meta.OpId, nil), nil
+	contextLogger := context.LogEntry("rule", con.Meta.RuleId)
+	ctx := context.WithValue(context.Background(), context.LoggerKey, contextLogger).WithMeta(con.Meta.RuleId, con.Meta.OpId, nil)
+	return ctx, nil
 }
 
 func broadcast(ctx api.StreamContext, sock connection.DataOutChannel, data interface{}) {

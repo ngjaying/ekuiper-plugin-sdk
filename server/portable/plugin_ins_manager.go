@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"github.com/lf-edge/ekuiper-plugin-server-sim/shared"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"sync"
@@ -96,21 +95,21 @@ func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin) (*pluginIns, er
 		return ins, nil
 	}
 
-	log.Println("create control channel")
+	Logger.Println("create control channel")
 	ctrlChan, err := CreateControlChannel(pluginMeta.Name)
 	if err != nil {
 		return nil, fmt.Errorf("can't create new control channel: %s", err.Error())
 	}
 
-	log.Println("executing plugin")
+	Logger.Println("executing plugin")
 	var cmd *exec.Cmd
 	switch pluginMeta.Language {
 	case "go":
-		log.Printf("starting go plugin executable %s\n", pluginMeta.Executable)
+		Logger.Printf("starting go plugin executable %s\n", pluginMeta.Executable)
 		cmd = exec.Command(pluginMeta.Executable)
 
 	case "python":
-		log.Printf("starting python plugin executable %s\n", pluginMeta.Executable)
+		Logger.Printf("starting python plugin executable %s\n", pluginMeta.Executable)
 		cmd = exec.Command("python", pluginMeta.Executable)
 	default:
 		return nil, fmt.Errorf("unsupported language: %s\n", pluginMeta.Language)
@@ -126,17 +125,17 @@ func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin) (*pluginIns, er
 	}
 	go logging(cmdStderr)
 
-	log.Println("plugin starting")
+	Logger.Println("plugin starting")
 	err = cmd.Start()
 	if err != nil {
 		return nil, fmt.Errorf("plugin executable %s stops with error %v\n", pluginMeta.Executable, err)
 	}
 	process := cmd.Process
-	log.Printf("plugin started pid: %d\n", process.Pid)
+	Logger.Printf("plugin started pid: %d\n", process.Pid)
 	go func() {
 		err = cmd.Wait()
 		if err != nil {
-			log.Printf("plugin executable %s stops with error %v\n", pluginMeta.Executable, err)
+			Logger.Printf("plugin executable %s stops with error %v\n", pluginMeta.Executable, err)
 		}
 		p.Lock()
 		defer p.Unlock()
@@ -146,7 +145,7 @@ func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin) (*pluginIns, er
 		}
 	}()
 
-	log.Println("waiting handshake")
+	Logger.Println("waiting handshake")
 	err = ctrlChan.Handshake()
 	if err != nil {
 		return nil, fmt.Errorf("plugin %s control handshake error: %v\n", pluginMeta.Executable, err)
@@ -157,7 +156,7 @@ func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin) (*pluginIns, er
 		ctrlChan: ctrlChan,
 	}
 	p.instances[pluginMeta.Name] = ins
-	log.Println("plugin start running")
+	Logger.Println("plugin start running")
 	return ins, nil
 }
 
@@ -165,6 +164,6 @@ func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin) (*pluginIns, er
 func logging(r io.Reader) {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
-		log.Printf("plugin log: %s\n", scanner.Text())
+		fmt.Printf("plugin log: %s\n", scanner.Text())
 	}
 }

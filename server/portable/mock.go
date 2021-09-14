@@ -16,12 +16,11 @@ package portable
 
 import (
 	"context"
+	filename "github.com/keepeye/logrus-filename"
 	"github.com/lf-edge/ekuiper/pkg/api"
-	"log"
+	"github.com/sirupsen/logrus"
 	"time"
 )
-
-var jsonArg = "{\"meta\":{\"ruleId\":\"rule1\",\"opId\":\"op1\",\"instanceId\":0},\"dataSource\":\"hello\",\"config\":{\"a\":1}}"
 
 type SourceMetadata struct {
 	// rule
@@ -63,7 +62,7 @@ func (c *MockContext) GetContext() context.Context {
 }
 
 func (c *MockContext) GetLogger() api.Logger {
-	return logger
+	return Logger
 }
 
 func (c *MockContext) GetRuleId() string {
@@ -133,53 +132,19 @@ func (c *MockContext) SaveState(checkpointId int64) error {
 	return nil
 }
 
-type Logger struct{}
+var Logger *logrus.Logger
 
-func (l *Logger) Debug(args ...interface{}) {
-	log.Print(args)
+func init() {
+	l := logrus.New()
+	filenameHook := filename.NewHook()
+	filenameHook.Field = "file"
+	l.AddHook(filenameHook)
+	l.SetFormatter(&logrus.TextFormatter{
+		TimestampFormat: "2006-01-02 15:04:05",
+		DisableColors:   true,
+		FullTimestamp:   true,
+	})
+	l.WithField("type", "main")
+	l.Infof("start running plugin runtime simulator")
+	Logger = l
 }
-
-func (l *Logger) Info(args ...interface{}) {
-	log.Print(args)
-}
-func (l *Logger) Warn(args ...interface{}) {
-	log.Print(args)
-}
-
-func (l *Logger) Error(args ...interface{}) {
-	log.Print(args)
-}
-
-func (l *Logger) Debugln(args ...interface{}) {
-	log.Println(args)
-}
-
-func (l *Logger) Infoln(args ...interface{}) {
-	log.Println(args)
-}
-
-func (l *Logger) Warnln(args ...interface{}) {
-	log.Println(args)
-}
-
-func (l *Logger) Errorln(args ...interface{}) {
-	log.Println(args)
-}
-
-func (l *Logger) Debugf(format string, args ...interface{}) {
-	log.Println(args)
-}
-
-func (l *Logger) Infof(format string, args ...interface{}) {
-	log.Println(args)
-}
-
-func (l *Logger) Warnf(format string, args ...interface{}) {
-	log.Println(args)
-}
-
-func (l *Logger) Errorf(format string, args ...interface{}) {
-	log.Println(args)
-}
-
-var logger = &Logger{}

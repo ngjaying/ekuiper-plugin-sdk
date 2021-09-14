@@ -42,6 +42,12 @@ type jsonSource struct {
 }
 
 func (s *jsonSource) Open(ctx api.StreamContext, consumer chan<- api.SourceTuple, _ chan<- error) {
+	if ctx == nil {
+		fmt.Println("context is nil")
+	}
+	if ctx.GetLogger() == nil {
+		fmt.Println("context logger is nil")
+	}
 	ctx.GetLogger().Infof("Start json source for rule %s", ctx.GetRuleId())
 	ticker := time.NewTicker(1 * time.Second)
 	c := 0
@@ -68,6 +74,3 @@ func (s *jsonSource) Close(ctx api.StreamContext) error {
 	ctx.GetLogger().Infof("Closing json source")
 	return nil
 }
-
-// TODO is this eliminatable?
-// arg "{\"meta\":{\"ruleId\":\"rule1\",\"opId\":\"op1\",\"instanceId\":0},\"dataSource\":\"hello\",\"config\":{\"a\":1}}"
