@@ -56,6 +56,7 @@ func setupFuncRuntime(con *shared.Control, s api.Function) (*funcRuntime, error)
 	}, nil
 }
 
+// TODO how to stop?
 func (s *funcRuntime) run() {
 	defer s.stop()
 	err := s.ch.Run(func(req []byte) []byte {

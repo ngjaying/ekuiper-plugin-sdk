@@ -19,6 +19,7 @@ import (
 	"github.com/lf-edge/ekuiper/pkg/api"
 	"go.nanomsg.org/mangos/v3"
 	"go.nanomsg.org/mangos/v3/protocol/pull"
+	"go.nanomsg.org/mangos/v3/protocol/push"
 	"go.nanomsg.org/mangos/v3/protocol/rep"
 	_ "go.nanomsg.org/mangos/v3/transport/all"
 )
@@ -134,6 +135,22 @@ func CreateFunctionChannel(ctx api.FunctionContext) (DataReqChannel, error) {
 		return nil, fmt.Errorf("can't listen on rep socket for %s: %s", url, err.Error())
 	}
 	return &NanomsgReqRepChannel{sock: sock}, nil
+}
+
+func CreateSinkChannel(ctx api.StreamContext) (DataOutChannel, error) {
+	var (
+		sock mangos.Socket
+		err  error
+	)
+	if sock, err = push.NewSocket(); err != nil {
+		return nil, fmt.Errorf("can't get new push socket: %s", err)
+	}
+	setSockOptions(sock)
+	url := fmt.Sprintf("ipc:///tmp/%s_%s_%d.ipc", ctx.GetRuleId(), ctx.GetOpId(), ctx.GetInstanceId())
+	if err = sock.Dial(url); err != nil {
+		return nil, fmt.Errorf("can't dial on push socket: %s", err.Error())
+	}
+	return sock, nil
 }
 
 func CreateControlChannel(pluginName string) (ControlChannel, error) {

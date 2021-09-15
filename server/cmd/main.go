@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"github.com/lf-edge/ekuiper-plugin-server-sim/portable"
+	"github.com/lf-edge/ekuiper-plugin-server-sim/shared"
 	"github.com/lf-edge/ekuiper/pkg/api"
 	"time"
 )
@@ -33,6 +34,7 @@ const (
 func main() {
 	var (
 		fs  *portable.PortableFunc
+		ss  *portable.PortableSink
 		err error
 		// sink *portable.PortableSink
 	)
@@ -41,7 +43,7 @@ func main() {
 		RuleId:     "rule1",
 		OpId:       "op1",
 		PluginName: "json",
-		PluginType: "source",
+		PluginType: shared.TYPE_SOURCE,
 		SymbolName: "json",
 		Lang:       lang,
 		Exe:        exe,
@@ -56,13 +58,30 @@ func main() {
 		RuleId:     "rule1",
 		OpId:       "op2",
 		PluginName: "json",
-		PluginType: "function",
+		PluginType: shared.TYPE_FUNC,
 		SymbolName: "wordcount",
 		Lang:       lang,
 		Exe:        exe,
 	}
 	fctx := portable.NewMockFuncContext(ctx.WithMeta(fm.RuleId, fm.OpId, nil), 0)
 	fs, err = portable.NewPortableFunc(fctx, fm)
+	if err != nil {
+		panic(err)
+	}
+
+	ssm := &portable.PortableMetadata{
+		RuleId:     "rule1",
+		OpId:       "op3",
+		PluginName: "json",
+		PluginType: shared.TYPE_SINK,
+		SymbolName: "flat",
+		Lang:       lang,
+		Exe:        exe,
+	}
+	ss = portable.NewPortableSink(ssm)
+	ss.Configure(map[string]interface{}{"a": 1})
+	ssctx := ctx.WithMeta(ssm.RuleId, ssm.OpId, nil)
+	err = ss.Open(ssctx)
 	if err != nil {
 		panic(err)
 	}
@@ -93,9 +112,23 @@ outer:
 						}()
 					}
 				}
+			} else if ss != nil {
+				err := ss.Collect(ssctx, tuple)
+				if err != nil {
+					portable.Logger.Info("sink result error %v", err)
+				}
 			}
 		case out := <-funcOut:
 			portable.Logger.Infof("received from function: %v", out)
+			if ss != nil {
+				err := ss.Collect(ssctx, map[string]interface{}{
+					"funcOut":   out,
+					"processed": true,
+				})
+				if err != nil {
+					portable.Logger.Info("sink result error %v", err)
+				}
+			}
 		case <-ticker:
 			portable.Logger.Info("stop after timeout")
 			cancel()

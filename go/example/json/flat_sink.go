@@ -12,32 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package context
+// flat the map and print out
+
+package main
 
 import (
-	filename "github.com/keepeye/logrus-filename"
 	"github.com/lf-edge/ekuiper-plugin-sdk/api"
-	"github.com/sirupsen/logrus"
+	"github.com/lf-edge/ekuiper-plugin-sdk/context"
 )
 
-var (
-	Log *logrus.Logger
-)
-
-func init() {
-	Log = logrus.New()
-	filenameHook := filename.NewHook()
-	filenameHook.Field = "file"
-	Log.AddHook(filenameHook)
-	Log.SetFormatter(&logrus.TextFormatter{
-		TimestampFormat: "2006-01-02 15:04:05",
-		DisableColors:   true,
-		FullTimestamp:   true,
-	})
-	//Log.Level = logrus.DebugLevel
-	Log.WithField("type", "plugin")
+type flatSink struct {
 }
 
-func LogEntry(key string, value interface{}) api.Logger {
-	return Log.WithField(key, value)
+func (m *flatSink) Configure(props map[string]interface{}) error {
+	context.Log.Infof("received config %+v", props)
+	return nil
+}
+
+func (m *flatSink) Open(ctx api.StreamContext) error {
+	ctx.GetLogger().Infof("opening flat sink")
+	return nil
+}
+
+func (m *flatSink) Collect(ctx api.StreamContext, item interface{}) error {
+	ctx.GetLogger().Infof("sink result for rule %s: %s", ctx.GetRuleId(), item)
+	return nil
+}
+
+func (m *flatSink) Close(ctx api.StreamContext) error {
+	ctx.GetLogger().Infof("close flat sink")
+	return nil
 }

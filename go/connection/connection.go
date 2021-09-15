@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"github.com/lf-edge/ekuiper-plugin-sdk/api"
 	"go.nanomsg.org/mangos/v3"
+	"go.nanomsg.org/mangos/v3/protocol/pull"
 	"go.nanomsg.org/mangos/v3/protocol/push"
 	"go.nanomsg.org/mangos/v3/protocol/req"
 	_ "go.nanomsg.org/mangos/v3/transport/all"
@@ -35,6 +36,11 @@ type ReplyFunc func([]byte) []byte
 type ControlChannel interface {
 	// reply with string message
 	Run(ReplyFunc) error
+	Closable
+}
+
+type DataInChannel interface {
+	Recv() ([]byte, error)
 	Closable
 }
 
@@ -122,6 +128,22 @@ func CreateFuncChannel(ctx api.FunctionContext) (DataInOutChannel, error) {
 		return nil, fmt.Errorf("can't dial on req socket: %s", err.Error())
 	}
 	return &NanomsgRepChannel{sock: sock}, nil
+}
+
+func CreateSinkChannel(ctx api.StreamContext) (DataInChannel, error) {
+	var (
+		sock mangos.Socket
+		err  error
+	)
+	if sock, err = pull.NewSocket(); err != nil {
+		return nil, fmt.Errorf("can't get new pull socket: %s", err)
+	}
+	setSockOptions(sock)
+	url := fmt.Sprintf("ipc:///tmp/%s_%s_%d.ipc", ctx.GetRuleId(), ctx.GetOpId(), ctx.GetInstanceId())
+	if err = sock.Listen(url); err != nil {
+		return nil, fmt.Errorf("can't listen on pull socket for %s: %s", url, err.Error())
+	}
+	return sock, nil
 }
 
 func setSockOptions(sock mangos.Socket) {

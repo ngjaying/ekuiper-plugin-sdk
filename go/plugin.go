@@ -129,6 +129,14 @@ func Start(args []string, conf *PluginConfig) {
 					reg.Set(regKey, sr)
 					logger.Infof("running source %s", ctrl.SymbolName)
 				case shared.TYPE_SINK:
+					sf := f.(NewSinkFunc)
+					sr, err := setupSinkRuntime(ctrl, sf())
+					if err != nil {
+						return []byte(err.Error())
+					}
+					go sr.run()
+					reg.Set(regKey, sr)
+					logger.Infof("running sink %s", ctrl.SymbolName)
 				case shared.TYPE_FUNC:
 					ff := f.(NewFunctionFunc)
 					fr, err := setupFuncRuntime(ctrl, ff())

@@ -34,5 +34,10 @@ func main() {
 				return &wordCount{}
 			},
 		},
+		Sinks: map[string]sdk.NewSinkFunc{
+			"flat": func() api.Sink {
+				return &flatSink{}
+			},
+		},
 	})
 }
