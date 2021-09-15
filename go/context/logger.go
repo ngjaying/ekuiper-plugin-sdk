@@ -34,6 +34,7 @@ func init() {
 		DisableColors:   true,
 		FullTimestamp:   true,
 	})
+	Log.Level = logrus.DebugLevel
 	Log.WithField("type", "plugin")
 }
 

@@ -43,11 +43,16 @@ type DataOutChannel interface {
 	Closable
 }
 
+type DataInOutChannel interface {
+	Run(ReplyFunc) error
+	Closable
+}
+
 type NanomsgRepChannel struct {
 	sock mangos.Socket
 }
 
-// TODO how to end running?
+// Run until process end
 func (r *NanomsgRepChannel) Run(f ReplyFunc) error {
 	err := r.sock.Send([]byte("handshake"))
 	if err != nil {
@@ -96,11 +101,27 @@ func CreateSourceChannel(ctx api.StreamContext) (DataOutChannel, error) {
 		return nil, fmt.Errorf("can't get new push socket: %s", err)
 	}
 	setSockOptions(sock)
-	url := fmt.Sprintf("ipc:///tmp/%s_%s.ipc", ctx.GetRuleId(), ctx.GetOpId())
+	url := fmt.Sprintf("ipc:///tmp/%s_%s_%d.ipc", ctx.GetRuleId(), ctx.GetOpId(), ctx.GetInstanceId())
 	if err = sock.Dial(url); err != nil {
 		return nil, fmt.Errorf("can't dial on push socket: %s", err.Error())
 	}
 	return sock, nil
+}
+
+func CreateFuncChannel(ctx api.FunctionContext) (DataInOutChannel, error) {
+	var (
+		sock mangos.Socket
+		err  error
+	)
+	if sock, err = req.NewSocket(); err != nil {
+		return nil, fmt.Errorf("can't get new req socket: %s", err)
+	}
+	setSockOptions(sock)
+	url := fmt.Sprintf("ipc:///tmp/%s_%s_%d_%d.ipc", ctx.GetRuleId(), ctx.GetOpId(), ctx.GetInstanceId(), ctx.GetFuncId())
+	if err = sock.Dial(url); err != nil {
+		return nil, fmt.Errorf("can't dial on req socket: %s", err.Error())
+	}
+	return &NanomsgRepChannel{sock: sock}, nil
 }
 
 func setSockOptions(sock mangos.Socket) {

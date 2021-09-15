@@ -15,24 +15,26 @@
 package main
 
 import (
-	sdk "github.com/lf-edge/ekuiper-plugin-sdk"
+	"fmt"
 	"github.com/lf-edge/ekuiper-plugin-sdk/api"
-	"os"
 )
 
-func main() {
-	// TODO key case sensitive?
-	sdk.Start(os.Args, &sdk.PluginConfig{
-		Name: "json",
-		Sources: map[string]sdk.NewSourceFunc{
-			"json": func() api.Source {
-				return &jsonSource{}
-			},
-		},
-		Functions: map[string]sdk.NewFunctionFunc{
-			"wordcount": func() api.Function {
-				return &wordCount{}
-			},
-		},
-	})
+type wordCount struct {
+}
+
+func (f *wordCount) Validate(args []interface{}) error {
+	if len(args) != 1 {
+		return fmt.Errorf("wordCount function only supports 1 parameter but got %d", len(args))
+	}
+	return nil
+}
+
+func (f *wordCount) Exec(args []interface{}, ctx api.FunctionContext) (interface{}, bool) {
+	arg := args[0]
+	count := len(fmt.Sprintf("%v", arg))
+	return count, true
+}
+
+func (f *wordCount) IsAggregate() bool {
+	return false
 }

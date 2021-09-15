@@ -23,21 +23,22 @@ import (
 	"time"
 )
 
-type SourceMetadata struct {
+type PortableMetadata struct {
 	// rule
 	RuleId string
 	OpId   string
 	// plugin
 	PluginName string
-	PluginType string
-	SymbolName string
 	Lang       string
 	Exe        string
+	// symbol
+	PluginType string
+	SymbolName string
 }
 
 type MockContext struct {
 	Ctx  context.Context
-	Meta *SourceMetadata
+	Meta PortableMetadata
 }
 
 //Implement context interface
@@ -88,9 +89,13 @@ func (c *MockContext) SetError(err error) {
 }
 
 func (c *MockContext) WithMeta(ruleId string, opId string, _ api.Store) api.StreamContext {
-	c.Meta.RuleId = ruleId
-	c.Meta.OpId = opId
-	return c
+	newMeta := c.Meta
+	newMeta.RuleId = ruleId
+	newMeta.OpId = opId
+	return &MockContext{
+		Meta: newMeta,
+		Ctx:  c.Ctx,
+	}
 }
 
 func (c *MockContext) WithInstance(_ int) api.StreamContext {
@@ -131,6 +136,22 @@ func (c *MockContext) Snapshot() error {
 
 func (c *MockContext) SaveState(checkpointId int64) error {
 	return nil
+}
+
+type MockFuncContext struct {
+	api.StreamContext
+	funcId int
+}
+
+func (fc *MockFuncContext) GetFuncId() int {
+	return fc.funcId
+}
+
+func NewMockFuncContext(ctx api.StreamContext, id int) api.FunctionContext {
+	return &MockFuncContext{
+		StreamContext: ctx,
+		funcId:        id,
+	}
 }
 
 var Logger *logrus.Logger

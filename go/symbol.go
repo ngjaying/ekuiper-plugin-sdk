@@ -17,7 +17,6 @@
 package sdk
 
 import (
-	context2 "context"
 	"encoding/json"
 	"fmt"
 	"github.com/lf-edge/ekuiper-plugin-sdk/api"
@@ -30,87 +29,6 @@ type RuntimeInstance interface {
 	run()
 	stop() error
 	isRunning() bool
-}
-
-// lifecycle controlled by plugin
-// if stop by error, inform plugin
-
-type sourceRuntime struct {
-	s      api.Source
-	ch     connection.DataOutChannel
-	ctx    api.StreamContext
-	cancel context2.CancelFunc
-	key    string
-}
-
-func setupSourceRuntime(con *shared.Control, s api.Source) (*sourceRuntime, error) {
-	// init context with args
-	ctx, err := parseContext(con)
-	// TODO check cmd error handling or using health check
-	if err != nil {
-		return nil, err
-	}
-	// init config with args and call source config
-	err = s.Configure(con.DataSource, con.Config)
-	if err != nil {
-		return nil, err
-	}
-	// connect to mq server
-	ch, err := connection.CreateSourceChannel(ctx)
-	if err != nil {
-		return nil, err
-	}
-	ctx.GetLogger().Info("Setup message pipeline, start sending")
-	ctx, cancel := ctx.WithCancel()
-	return &sourceRuntime{
-		s:      s,
-		ch:     ch,
-		ctx:    ctx,
-		cancel: cancel,
-		key:    fmt.Sprintf("%s_%s_%d_%s", con.Meta.RuleId, con.Meta.OpId, con.Meta.InstanceId, con.SymbolName),
-	}, nil
-}
-
-func (s *sourceRuntime) run() {
-	errCh := make(chan error)
-	consumer := make(chan api.SourceTuple)
-	go s.s.Open(s.ctx, consumer, errCh)
-	for {
-		select {
-		case err := <-errCh:
-			s.ctx.GetLogger().Errorf("%v", err)
-			broadcast(s.ctx, s.ch, err)
-			s.stop()
-		case data := <-consumer:
-			s.ctx.GetLogger().Debugf("broadcast data %v", data)
-			broadcast(s.ctx, s.ch, data)
-		case <-s.ctx.Done():
-			s.s.Close(s.ctx)
-			return
-		}
-	}
-}
-
-func (s *sourceRuntime) stop() error {
-	s.cancel()
-	s.ch.Close()
-	reg.Delete(s.key)
-	return nil
-}
-
-func (s *sourceRuntime) isRunning() bool {
-	return s.ctx.Err() == nil
-}
-
-func parseContext(con *shared.Control) (api.StreamContext, error) {
-	if con.Meta.RuleId == "" || con.Meta.OpId == "" {
-		err := fmt.Sprintf("invalid arg %v, ruleId and opId are required", con)
-		context.Log.Errorf(err)
-		return nil, fmt.Errorf(err)
-	}
-	contextLogger := context.LogEntry("rule", con.Meta.RuleId)
-	ctx := context.WithValue(context.Background(), context.LoggerKey, contextLogger).WithMeta(con.Meta.RuleId, con.Meta.OpId, nil)
-	return ctx, nil
 }
 
 func broadcast(ctx api.StreamContext, sock connection.DataOutChannel, data interface{}) {
@@ -136,4 +54,15 @@ func broadcast(ctx api.StreamContext, sock connection.DataOutChannel, data inter
 	if err = sock.Send(result); err != nil {
 		ctx.GetLogger().Errorf("Failed publishing: %s", err.Error())
 	}
+}
+
+func parseContext(con *shared.Control) (api.StreamContext, error) {
+	if con.Meta.RuleId == "" || con.Meta.OpId == "" {
+		err := fmt.Sprintf("invalid arg %v, ruleId and opId are required", con)
+		context.Log.Errorf(err)
+		return nil, fmt.Errorf(err)
+	}
+	contextLogger := context.LogEntry("rule", con.Meta.RuleId)
+	ctx := context.WithValue(context.Background(), context.LoggerKey, contextLogger).WithMeta(con.Meta.RuleId, con.Meta.OpId, nil)
+	return ctx, nil
 }

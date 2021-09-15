@@ -58,28 +58,33 @@ func initVars(args []string, conf *PluginConfig) {
 }
 
 type NewSourceFunc func() api.Source
+type NewFunctionFunc func() api.Function
+type NewSinkFunc func() api.Sink
 
 // PluginConfig construct once and then read only
 type PluginConfig struct {
-	Name    string
-	Sources map[string]NewSourceFunc
+	Name      string
+	Sources   map[string]NewSourceFunc
+	Functions map[string]NewFunctionFunc
+	Sinks     map[string]NewSinkFunc
 }
 
-const (
-	TYPE_SOURCE   = "source"
-	TYPE_SINK     = "sink"
-	TYPE_FUNC     = "func"
-	TYPE_NOTFOUND = "none"
-)
-
-func (conf *PluginConfig) Get(symbolName string) (pluginType string, builderFunc interface{}) {
-	if f, ok := conf.Sources[symbolName]; ok {
-		return TYPE_SOURCE, f
+func (conf *PluginConfig) Get(pluginType string, symbolName string) (builderFunc interface{}) {
+	switch pluginType {
+	case shared.TYPE_SOURCE:
+		if f, ok := conf.Sources[symbolName]; ok {
+			return f
+		}
+	case shared.TYPE_FUNC:
+		if f, ok := conf.Functions[symbolName]; ok {
+			return f
+		}
+	case shared.TYPE_SINK:
+		if f, ok := conf.Sinks[symbolName]; ok {
+			return f
+		}
 	}
-	//if f, ok := conf.Sources[symbolName]; ok {
-	//	return TYPE_SINK
-	//}
-	return TYPE_NOTFOUND, nil
+	return nil
 }
 
 // Start Connect to control plane
@@ -109,20 +114,30 @@ func Start(args []string, conf *PluginConfig) {
 			regKey := fmt.Sprintf("%s_%s_%d_%s", ctrl.Meta.RuleId, ctrl.Meta.OpId, ctrl.Meta.InstanceId, ctrl.SymbolName)
 			switch c.Cmd {
 			case shared.CMD_START:
-				pt, f := conf.Get(ctrl.SymbolName)
-				switch pt {
-				case TYPE_SOURCE:
+				f := conf.Get(ctrl.PluginType, ctrl.SymbolName)
+				if f == nil {
+					return []byte("symbol not found")
+				}
+				switch ctrl.PluginType {
+				case shared.TYPE_SOURCE:
 					sf := f.(NewSourceFunc)
 					sr, err := setupSourceRuntime(ctrl, sf())
 					if err != nil {
 						return []byte(err.Error())
 					}
-					// TODO need to know how many are running
 					go sr.run()
 					reg.Set(regKey, sr)
 					logger.Infof("running source %s", ctrl.SymbolName)
-				case TYPE_SINK:
-				case TYPE_FUNC:
+				case shared.TYPE_SINK:
+				case shared.TYPE_FUNC:
+					ff := f.(NewFunctionFunc)
+					fr, err := setupFuncRuntime(ctrl, ff())
+					if err != nil {
+						return []byte(err.Error())
+					}
+					go fr.run()
+					reg.Set(regKey, fr)
+					logger.Infof("running function %s", ctrl.SymbolName)
 				default:
 					return []byte("symbol not found")
 				}

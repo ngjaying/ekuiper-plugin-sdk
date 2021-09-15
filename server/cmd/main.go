@@ -31,7 +31,13 @@ const (
 )
 
 func main() {
-	sm := &portable.SourceMetadata{
+	var (
+		fs  *portable.PortableFunc
+		err error
+		// sink *portable.PortableSink
+	)
+
+	sm := portable.PortableMetadata{
 		RuleId:     "rule1",
 		OpId:       "op1",
 		PluginName: "json",
@@ -40,14 +46,31 @@ func main() {
 		Lang:       lang,
 		Exe:        exe,
 	}
-	s := portable.NewPortableSource("json", sm)
+	s := portable.NewPortableSource(&sm)
 	ctx, cancel := (&portable.MockContext{
 		Meta: sm,
 		Ctx:  context.Background(),
 	}).WithCancel()
-	consumer := make(chan api.SourceTuple)
+
+	fm := &portable.PortableMetadata{
+		RuleId:     "rule1",
+		OpId:       "op2",
+		PluginName: "json",
+		PluginType: "function",
+		SymbolName: "wordcount",
+		Lang:       lang,
+		Exe:        exe,
+	}
+	fctx := portable.NewMockFuncContext(ctx.WithMeta(fm.RuleId, fm.OpId, nil), 0)
+	fs, err = portable.NewPortableFunc(fctx, fm)
+	if err != nil {
+		panic(err)
+	}
+
+	sourceOut := make(chan api.SourceTuple)
+	funcOut := make(chan interface{})
 	errCh := make(chan error)
-	go s.Open(ctx, consumer, errCh)
+	go s.Open(ctx.WithMeta(sm.RuleId, sm.OpId, nil), sourceOut, errCh)
 
 	ticker := time.After(10 * time.Second)
 
@@ -57,8 +80,22 @@ outer:
 		case err := <-errCh:
 			portable.Logger.Infof("received error: %v", err)
 			cancel()
-		case tuple := <-consumer:
-			portable.Logger.Infof("received tuple: %v", tuple)
+		case tuple := <-sourceOut:
+			portable.Logger.Infof("received from source tuple: %v", tuple)
+			if fs != nil {
+				if color, ok := tuple.Message()["color"]; ok {
+					r, ok := fs.Exec([]interface{}{color}, fctx)
+					if !ok {
+						portable.Logger.Info("function result error")
+					} else {
+						go func() {
+							funcOut <- r
+						}()
+					}
+				}
+			}
+		case out := <-funcOut:
+			portable.Logger.Infof("received from function: %v", out)
 		case <-ticker:
 			portable.Logger.Info("stop after timeout")
 			cancel()
@@ -66,8 +103,8 @@ outer:
 		}
 	}
 
-	time.Sleep(20 * time.Second)
-	pm := portable.GetPluginInsManager()
-	pm.KillAll()
-
+	defer func() {
+		pm := portable.GetPluginInsManager()
+		pm.KillAll()
+	}()
 }

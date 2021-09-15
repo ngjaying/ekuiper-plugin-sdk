@@ -51,6 +51,26 @@ type Source interface {
 	Closable
 }
 
+type Function interface {
+	//The argument is a list of xsql.Expr
+	Validate(args []interface{}) error
+	//Execute the function, return the result and if execution is successful.
+	//If execution fails, return the error and false.
+	Exec(args []interface{}, ctx FunctionContext) (interface{}, bool)
+	//If this function is an aggregate function. Each parameter of an aggregate function will be a slice
+	IsAggregate() bool
+}
+
+type Sink interface {
+	//Should be sync function for normal case. The container will run it in go func
+	Open(ctx StreamContext) error
+	//Called during initialization. Configure the sink with the properties from rule action definition
+	Configure(props map[string]interface{}) error
+	//Called when each row of data has transferred to this sink
+	Collect(ctx StreamContext, data interface{}) error
+	Closable
+}
+
 type Closable interface {
 	Close(ctx StreamContext) error
 }
@@ -94,4 +114,9 @@ type StreamContext interface {
 	PutState(key string, value interface{}) error
 	GetState(key string) (interface{}, error)
 	DeleteState(key string) error
+}
+
+type FunctionContext interface {
+	StreamContext
+	GetFuncId() int
 }

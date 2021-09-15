@@ -15,25 +15,30 @@
 package portable
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/lf-edge/ekuiper-plugin-server-sim/shared"
 	"github.com/lf-edge/ekuiper/pkg/api"
-	"github.com/lf-edge/ekuiper/pkg/message"
 )
 
 // Error handling: wrap all error in a function to handle
 
+type DefaultSourceTuple struct {
+	Mess map[string]interface{} `json:"message"`
+	M    map[string]interface{} `json:"meta"`
+}
+
 type PortableSource struct {
 	name string
-	reg  *SourceMetadata
+	reg  *PortableMetadata
 
 	topic string
 	props map[string]interface{}
 }
 
-func NewPortableSource(name string, reg *SourceMetadata) *PortableSource {
+func NewPortableSource(reg *PortableMetadata) *PortableSource {
 	return &PortableSource{
-		name:  name,
+		name:  reg.SymbolName,
 		reg:   reg,
 		topic: "hello",
 		props: map[string]interface{}{"a": 1},
@@ -71,6 +76,7 @@ func (ps *PortableSource) Open(ctx api.StreamContext, consumer chan<- api.Source
 			InstanceId: ctx.GetInstanceId(),
 		},
 		SymbolName: ps.reg.SymbolName,
+		PluginType: shared.TYPE_SOURCE,
 		DataSource: ps.topic,
 		Config:     ps.props,
 	}
@@ -89,13 +95,14 @@ func (ps *PortableSource) Open(ctx api.StreamContext, consumer chan<- api.Source
 			errCh <- fmt.Errorf("cannot receive from mangos Socket: %s", err.Error())
 			return
 		}
-		result, e := message.Decode(msg, "json")
+		result := &DefaultSourceTuple{}
+		e := json.Unmarshal(msg, result)
 		if e != nil {
 			ctx.GetLogger().Errorf("Invalid data format, cannot decode %s to json format with error %s", string(msg), e)
 			continue
 		}
 		select {
-		case consumer <- api.NewDefaultSourceTuple(result, nil):
+		case consumer <- api.NewDefaultSourceTuple(result.Mess, result.M):
 			ctx.GetLogger().Debugf("send data to source node")
 		case <-ctx.Done():
 			ctx.GetLogger().Info("stop source")

@@ -50,7 +50,7 @@ func (r *NanomsgReqChannel) Close() error {
 
 func (r *NanomsgReqChannel) SendCmd(arg []byte) error {
 	if err := r.sock.Send(arg); err != nil {
-		return fmt.Errorf("can't send message on push socket: %s", err.Error())
+		return fmt.Errorf("can't send message on rep socket: %s", err.Error())
 	}
 	if msg, err := r.sock.Recv(); err != nil {
 		return fmt.Errorf("can't receive: %s", err.Error())
@@ -72,6 +72,37 @@ type DataInChannel interface {
 	Closable
 }
 
+type DataOutChannel interface {
+	Send([]byte) error
+	Closable
+}
+
+type DataReqChannel interface {
+	Handshake() error
+	Req([]byte) ([]byte, error)
+	Closable
+}
+
+type NanomsgReqRepChannel struct {
+	sock mangos.Socket
+}
+
+func (r *NanomsgReqRepChannel) Close() error {
+	return r.sock.Close()
+}
+
+func (r *NanomsgReqRepChannel) Req(arg []byte) ([]byte, error) {
+	if err := r.sock.Send(arg); err != nil {
+		return nil, fmt.Errorf("can't send message on rep socket: %s", err.Error())
+	}
+	return r.sock.Recv()
+}
+
+func (r *NanomsgReqRepChannel) Handshake() error {
+	_, err := r.sock.Recv()
+	return err
+}
+
 func CreateSourceChannel(ctx api.StreamContext) (DataInChannel, error) {
 	var (
 		sock mangos.Socket
@@ -81,11 +112,28 @@ func CreateSourceChannel(ctx api.StreamContext) (DataInChannel, error) {
 		return nil, fmt.Errorf("can't get new pull socket: %s", err)
 	}
 	setSockOptions(sock)
-	url := fmt.Sprintf("ipc:///tmp/%s_%s.ipc", ctx.GetRuleId(), ctx.GetOpId())
+	url := fmt.Sprintf("ipc:///tmp/%s_%s_%d.ipc", ctx.GetRuleId(), ctx.GetOpId(), ctx.GetInstanceId())
 	if err = sock.Listen(url); err != nil {
 		return nil, fmt.Errorf("can't listen on pull socket for %s: %s", url, err.Error())
 	}
 	return sock, nil
+}
+
+func CreateFunctionChannel(ctx api.FunctionContext) (DataReqChannel, error) {
+	var (
+		sock mangos.Socket
+		err  error
+	)
+	if sock, err = rep.NewSocket(); err != nil {
+		return nil, fmt.Errorf("can't get new rep socket: %s", err)
+	}
+	setSockOptions(sock)
+	sock.SetOption(mangos.OptionRecvDeadline, 1000)
+	url := fmt.Sprintf("ipc:///tmp/%s_%s_%d_%d.ipc", ctx.GetRuleId(), ctx.GetOpId(), ctx.GetInstanceId(), ctx.GetFuncId())
+	if err = sock.Listen(url); err != nil {
+		return nil, fmt.Errorf("can't listen on rep socket for %s: %s", url, err.Error())
+	}
+	return &NanomsgReqRepChannel{sock: sock}, nil
 }
 
 func CreateControlChannel(pluginName string) (ControlChannel, error) {
@@ -97,6 +145,7 @@ func CreateControlChannel(pluginName string) (ControlChannel, error) {
 		return nil, fmt.Errorf("can't get new rep socket: %s", err)
 	}
 	setSockOptions(sock)
+	sock.SetOption(mangos.OptionRecvDeadline, 100)
 	url := fmt.Sprintf("ipc:///tmp/plugin_%s.ipc", pluginName)
 	if err = sock.Listen(url); err != nil {
 		return nil, fmt.Errorf("can't listen on rep socket: %s", err.Error())

@@ -23,6 +23,8 @@ type Meta struct {
 type Control struct {
 	SymbolName string                 `json:"symbolName"`
 	Meta       *Meta                  `json:"meta,omitempty"`
+	PluginType string                 `json:"pluginType"`
+	FuncId     int                    `json:"funcId,omitempty"`
 	DataSource string                 `json:"dataSource,omitempty"`
 	Config     map[string]interface{} `json:"config,omitempty"`
 }
@@ -44,3 +46,19 @@ const (
 type PortableConfig struct {
 	SendTimeout int64 `json:"sendTimeout"`
 }
+
+type FuncData struct {
+	Func string      `json:"func"`
+	Arg  interface{} `json:"arg"`
+}
+
+type FuncReply struct {
+	State  bool        `json:"state"`
+	Result interface{} `json:"result"`
+}
+
+const (
+	TYPE_SOURCE = "source"
+	TYPE_SINK   = "sink"
+	TYPE_FUNC   = "func"
+)

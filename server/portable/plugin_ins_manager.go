@@ -171,7 +171,7 @@ func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin, conf *shared.Po
 	Logger.Println("waiting handshake")
 	err = ctrlChan.Handshake()
 	if err != nil {
-		return nil, fmt.Errorf("plugin %s control handshake error: %v\n", pluginMeta.Executable, err)
+		return nil, fmt.Errorf("plugin %s control handshake error: %v", pluginMeta.Executable, err)
 	}
 
 	ins := &pluginIns{
