@@ -40,3 +40,7 @@ const (
 const (
 	REPLY_OK = "ok"
 )
+
+type PortableConfig struct {
+	SendTimeout int64 `json:"sendTimeout"`
+}

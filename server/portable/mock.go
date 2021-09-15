@@ -17,6 +17,7 @@ package portable
 import (
 	"context"
 	filename "github.com/keepeye/logrus-filename"
+	"github.com/lf-edge/ekuiper-plugin-server-sim/shared"
 	"github.com/lf-edge/ekuiper/pkg/api"
 	"github.com/sirupsen/logrus"
 	"time"
@@ -147,4 +148,8 @@ func init() {
 	l.WithField("type", "main")
 	l.Infof("start running plugin runtime simulator")
 	Logger = l
+}
+
+var PortbleConf = &shared.PortableConfig{
+	SendTimeout: 1000,
 }

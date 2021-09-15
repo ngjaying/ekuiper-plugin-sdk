@@ -36,3 +36,11 @@ const (
 	CMD_START = "start"
 	CMD_STOP  = "stop"
 )
+
+const (
+	REPLY_OK = "ok"
+)
+
+type PortableConfig struct {
+	SendTimeout int64 `json:"sendTimeout"`
+}

@@ -48,7 +48,7 @@ func (ps *PortableSource) Open(ctx api.StreamContext, consumer chan<- api.Source
 		Executable: ps.reg.Exe,
 	}
 	pm := GetPluginInsManager()
-	ins, err := pm.getOrStartProcess(pluginMeta)
+	ins, err := pm.getOrStartProcess(pluginMeta, PortbleConf)
 	if err != nil {
 		errCh <- err
 		return

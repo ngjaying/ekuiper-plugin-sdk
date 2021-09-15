@@ -23,6 +23,7 @@ import (
 	"github.com/lf-edge/ekuiper-plugin-sdk/connection"
 	"github.com/lf-edge/ekuiper-plugin-sdk/context"
 	"github.com/lf-edge/ekuiper-plugin-sdk/shared"
+	"go.nanomsg.org/mangos/v3"
 	"os"
 	"os/signal"
 	"sync"
@@ -34,11 +35,25 @@ var (
 	reg    runtimes
 )
 
-func initVars(conf *PluginConfig) {
+func initVars(args []string, conf *PluginConfig) {
 	logger = context.LogEntry("plugin", conf.Name)
 	reg = runtimes{
 		content: make(map[string]RuntimeInstance),
 		RWMutex: sync.RWMutex{},
+	}
+	// parse Args
+	if len(args) == 2 {
+		pc := &shared.PortableConfig{}
+		err := json.Unmarshal([]byte(args[1]), pc)
+		if err != nil {
+			panic(fmt.Sprintf("fail to parse args %v", args))
+		}
+		connection.Options = map[string]interface{}{
+			mangos.OptionSendDeadline: pc.SendTimeout,
+		}
+		logger.Infof("config parsed to %v", pc)
+	} else {
+		connection.Options = make(map[string]interface{})
 	}
 }
 
@@ -69,14 +84,14 @@ func (conf *PluginConfig) Get(symbolName string) (pluginType string, builderFunc
 
 // Start Connect to control plane
 // Only run once at process startup
-// TODO parse configuration like debug mode
-func Start(_ []string, conf *PluginConfig) {
-	initVars(conf)
-	logger.Info("starting plugin, creating control channel")
+func Start(args []string, conf *PluginConfig) {
+	initVars(args, conf)
+	logger.Info("starting plugin")
 	ch, err := connection.CreateControlChannel(conf.Name)
 	if err != nil {
 		panic(err)
 	}
+	defer ch.Close()
 	go func() {
 		logger.Info("running control channel")
 		err = ch.Run(func(req []byte) []byte { // not parallel run now

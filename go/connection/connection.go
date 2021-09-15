@@ -23,6 +23,9 @@ import (
 	_ "go.nanomsg.org/mangos/v3/transport/all"
 )
 
+// Options Initialized in plugin.go Start according to the config
+var Options map[string]interface{}
+
 type Closable interface {
 	Close() error
 }
@@ -76,6 +79,7 @@ func CreateControlChannel(pluginName string) (ControlChannel, error) {
 	if sock, err = req.NewSocket(); err != nil {
 		return nil, fmt.Errorf("can't get new req socket: %s", err)
 	}
+	setSockOptions(sock)
 	url := fmt.Sprintf("ipc:///tmp/plugin_%s.ipc", pluginName)
 	if err = sock.Dial(url); err != nil {
 		return nil, fmt.Errorf("can't dial on req socket: %s", err.Error())
@@ -91,9 +95,16 @@ func CreateSourceChannel(ctx api.StreamContext) (DataOutChannel, error) {
 	if sock, err = push.NewSocket(); err != nil {
 		return nil, fmt.Errorf("can't get new push socket: %s", err)
 	}
+	setSockOptions(sock)
 	url := fmt.Sprintf("ipc:///tmp/%s_%s.ipc", ctx.GetRuleId(), ctx.GetOpId())
 	if err = sock.Dial(url); err != nil {
 		return nil, fmt.Errorf("can't dial on push socket: %s", err.Error())
 	}
 	return sock, nil
+}
+
+func setSockOptions(sock mangos.Socket) {
+	for k, v := range Options {
+		sock.SetOption(k, v)
+	}
 }

@@ -23,6 +23,11 @@ import (
 	_ "go.nanomsg.org/mangos/v3/transport/all"
 )
 
+// Options Initialized in config
+var Options = map[string]interface{}{
+	mangos.OptionSendDeadline: 1000,
+}
+
 // TODO control connection close; data connection close
 
 type Closable interface {
@@ -75,6 +80,7 @@ func CreateSourceChannel(ctx api.StreamContext) (DataInChannel, error) {
 	if sock, err = pull.NewSocket(); err != nil {
 		return nil, fmt.Errorf("can't get new pull socket: %s", err)
 	}
+	setSockOptions(sock)
 	url := fmt.Sprintf("ipc:///tmp/%s_%s.ipc", ctx.GetRuleId(), ctx.GetOpId())
 	if err = sock.Listen(url); err != nil {
 		return nil, fmt.Errorf("can't listen on pull socket for %s: %s", url, err.Error())
@@ -90,9 +96,16 @@ func CreateControlChannel(pluginName string) (ControlChannel, error) {
 	if sock, err = rep.NewSocket(); err != nil {
 		return nil, fmt.Errorf("can't get new rep socket: %s", err)
 	}
+	setSockOptions(sock)
 	url := fmt.Sprintf("ipc:///tmp/plugin_%s.ipc", pluginName)
 	if err = sock.Listen(url); err != nil {
 		return nil, fmt.Errorf("can't listen on rep socket: %s", err.Error())
 	}
 	return &NanomsgReqChannel{sock: sock}, nil
+}
+
+func setSockOptions(sock mangos.Socket) {
+	for k, v := range Options {
+		sock.SetOption(k, v)
+	}
 }

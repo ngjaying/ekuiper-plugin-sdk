@@ -115,7 +115,7 @@ func (p *pluginInsManager) getPluginIns(name string) (*pluginIns, bool) {
 	return ins, ok
 }
 
-func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin) (*pluginIns, error) {
+func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin, conf *shared.PortableConfig) (*pluginIns, error) {
 	p.Lock()
 	defer p.Unlock()
 	if ins, ok := p.instances[pluginMeta.Name]; ok {
@@ -129,17 +129,21 @@ func (p *pluginInsManager) getOrStartProcess(pluginMeta *Plugin) (*pluginIns, er
 	}
 
 	Logger.Println("executing plugin")
+	jsonArg, err := json.Marshal(conf)
+	if err != nil {
+		return nil, fmt.Errorf("invalid conf: %v", conf)
+	}
 	var cmd *exec.Cmd
 	switch pluginMeta.Language {
 	case "go":
-		Logger.Printf("starting go plugin executable %s\n", pluginMeta.Executable)
-		cmd = exec.Command(pluginMeta.Executable)
+		Logger.Printf("starting go plugin executable %s", pluginMeta.Executable)
+		cmd = exec.Command(pluginMeta.Executable, string(jsonArg))
 
 	case "python":
 		Logger.Printf("starting python plugin executable %s\n", pluginMeta.Executable)
-		cmd = exec.Command("python", pluginMeta.Executable)
+		cmd = exec.Command("python", pluginMeta.Executable, string(jsonArg))
 	default:
-		return nil, fmt.Errorf("unsupported language: %s\n", pluginMeta.Language)
+		return nil, fmt.Errorf("unsupported language: %s", pluginMeta.Language)
 	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
