@@ -11,27 +11,23 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import time
 
-from sources.source import Source
+from abc import abstractmethod
 
-class PyJson(Source):
-    def __init__(self):
-        self.data = {"name":"pyjson", "value": 2021}
+class Source(object):
+    """abstract class for eKuiper source plugin"""
 
+    @abstractmethod
     def configure(self, datasource, conf):
-        print("configuring with datasource {} and conf {}".format(datasource, conf))
+        """configure with the string datasource and conf map and raise error if any"""
+        pass
 
+    @abstractmethod
     def open(self, ctx):
-        print("opening")
-        for i in range(100):
-            ctx.emit(self.data, None)
-            print("emit")
-            time.sleep(30)
+        """run continuously and send out the data or error with ctx"""
+        pass
 
+    @abstractmethod
     def close(self, ctx):
-        print("closing")
-
-if __name__ == '__main__':
-    plugin = PyJson()
-    plugin.run()
+        """stop running and clean up"""
+        pass

@@ -13,29 +13,16 @@
 #  limitations under the License.
 import sys
 
-import context
+from pynng import Req0
 
-class ContextImpl(context.Context):
-    def __init__(self, ruleId, opId, instanceId, emitter):
-        self.ruleId = ruleId
-        self.opId = opId
-        self.instanceId = instanceId
-        self.emitter = emitter
-
-    def get_rule_id(self):
-        return self.ruleId
-
-    def get_op_id(self):
-        return self.opId
-
-    def get_instance_id(self):
-        return self.instanceId
-
-    def get_logger(self):
-        return sys.stdout
-
-    def emit(self, message, meta):
-        return self.emitter.emit(message, meta)
-
-    def emit_error(self, error):
-        return self.emitter.emit(error)
+if __name__ == '__main__':
+    s2 = Req0()
+    try:
+        s2.dial('ipc:///tmp/plugin_$$test.ipc')
+        print('dialed')
+        s2.send(b'handshake')
+        print('sent')
+    except:
+        print("Unexpected error:", sys.exc_info()[0])
+    print('stopping')
+    s2.close()

@@ -11,25 +11,10 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import json
+from ekuiper.runtime import contextimpl
 
-from pynng import Pair0
 
-class NanomsgSock(object):
-    def __init__(self, url):
-        s = Pair0()
-        s.dial(url)
-        self.sock = s
-
-    def emit(self, msg, meta):
-        data = {'message': msg, 'meta': meta}
-        json_str = json.dumps(data)
-        self.sock.send(str.encode(json_str))
-
-    def emit_error(self, error):
-        data = {'error': error}
-        json_str = json.dumps(data)
-        self.sock.send(str.encode(json_str))
-
-    def close(self):
-        self.sock.close()
+def parse_context(ctrl):
+    if ctrl['meta']['ruleId'] == "" or ctrl['meta']['opId'] == "":
+        raise('invalid arg: ', ctrl, 'ruleId and opId are required')
+    return contextimpl.ContextImpl(ctrl['meta'])

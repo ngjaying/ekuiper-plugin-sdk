@@ -10,18 +10,9 @@
 #  distributed under the License is distributed on an "AS IS" BASIS,
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
-#  limitations under the License
+#  limitations under the License.
 import json
-import sys
-from gettext import gettext
-from types import SimpleNamespace
 
-
-def parseArgs():
-    if len(sys.argv) != 2:
-        msg = gettext('fail to init plugin, must pass exactly 2 args but got {}'.format(sys.argv))
-        raise ValueError(msg)
-    """TODO validation"""
-    c = json.loads(sys.argv[1], object_hook=lambda d: SimpleNamespace(**d))
-    return c
-
+if __name__ == '__main__':
+    command = json.loads(b'{"cmd":"start","arg":"{\\"symbolName\\":\\"pyjson\\",\\"meta\\":{\\"ruleId\\":\\"rule1\\",\\"opId\\":\\"op1\\",\\"instanceId\\":1},\\"pluginType\\":\\"source\\"}"}')
+    print(command)
