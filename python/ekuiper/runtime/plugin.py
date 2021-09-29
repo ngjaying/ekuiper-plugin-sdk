@@ -23,15 +23,29 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 import json
 import threading
 import traceback
 
+from ekuiper.runtime import reg
 from ekuiper.runtime import shared
-from ekuiper.runtime.connection import ControlChannel
+from ekuiper.runtime.connection import PairChannel
+from ekuiper.runtime.function import FunctionRuntime
+from ekuiper.runtime.sink import SinkRuntime
 from ekuiper.runtime.source import SourceRuntime
 
-reg = {}
 conf = None
 
 
@@ -40,7 +54,7 @@ def start(c):
     global conf
     conf = c
     print("starting plugin {}".format(c.name))
-    ch = ControlChannel(c.name)
+    ch = PairChannel(c.name, 0)
     ch.run(command_reply)
 
 
@@ -69,17 +83,28 @@ def command_reply(req):
                 runtime = SourceRuntime(ctrl, s)
                 x = threading.Thread(target=runtime.run, daemon=True)
                 x.start()
-                regkey = "{}_{}_{}_{}".format(ctrl['meta']['ruleId'], ctrl['meta']['opId'], ctrl['meta']['instanceId'],
-                                              ctrl['symbolName'])
-                reg[regkey] = runtime
             elif ctrl['pluginType'] == shared.TYPE_SINK:
-                pass
+                print("running sink {}".format(ctrl['symbolName']))
+                runtime = SinkRuntime(ctrl, s)
+                x = threading.Thread(target=runtime.run, daemon=True)
+                x.start()
             elif ctrl['pluginType'] == shared.TYPE_FUNC:
-                pass
+                print("running function {}".format(ctrl['symbolName']))
+                runtime = FunctionRuntime(ctrl, s)
+                x = threading.Thread(target=runtime.run, daemon=True)
+                x.start()
             else:
                 return b'invalid plugin type'
         elif cmd['cmd'] == shared.CMD_STOP:
-            pass
+            regkey = "{}_{}_{}_{}".format(ctrl['meta']['ruleId'], ctrl['meta']['opId'], ctrl['meta']['instanceId'],
+                                          ctrl['symbolName'])
+            print("stopping ", regkey)
+            if reg.has(regkey):
+                runtime = reg.get(regkey)
+                if runtime.is_running():
+                    runtime.stop()
+            else:
+                print("symbol ", regkey, " not found")
         return b'ok'
     except:
         var = traceback.format_exc()

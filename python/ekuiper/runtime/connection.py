@@ -23,17 +23,32 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from concurrent.futures import thread
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+import time
 
-from pynng import Req0, Push0
+from pynng import Req0, Push0, Pull0
 
 
-class ControlChannel:
+class PairChannel:
 
-    def __init__(self, plugin_name):
+    def __init__(self, name, typ):
         s = Req0()
         """TODO options"""
-        url = "ipc:///tmp/plugin_{}.ipc".format(plugin_name)
+        if typ == 0:
+            url = "ipc:///tmp/plugin_{}.ipc".format(name)
+        else:
+            url = "ipc:///tmp/func_{}.ipc".format(name)
         s.dial(url)
         self.sock = s
 
@@ -64,3 +79,33 @@ class SourceChannel:
 
     def close(self):
         self.sock.close()
+
+
+class SinkChannel:
+
+    def __init__(self, meta):
+        s = Pull0()
+        url = "ipc:///tmp/{}_{}_{}.ipc".format(meta['ruleId'], meta['opId'], meta['instanceId'])
+        print(url)
+        listen_with_retry(s, url)
+        self.sock = s
+
+    def recv(self):
+        return self.sock.recv()
+
+    def close(self):
+        self.sock.close()
+
+
+def listen_with_retry(sock, url):
+    retry_count = 10
+    retry_interval = 0.05
+    while True:
+        try:
+            sock.listen(url)
+            break
+        except:
+            retry_count -= 1
+            if retry_count < 0:
+                raise
+        time.sleep(retry_interval)

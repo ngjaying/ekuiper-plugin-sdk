@@ -23,31 +23,22 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from abc import abstractmethod
-
-from ekuiper.runtime import contextimpl
+from ekuiper.function import Function
 
 
-class SymbolRuntime:
-    """class to model the running symbol of source/sink/function"""
+class RevertFunc(Function):
 
-    @abstractmethod
-    def run(self):
-        """start to run the symbol"""
+    def __init__(self):
         pass
 
-    @abstractmethod
-    def stop(self):
-        """stop the symbol"""
-        pass
+    def validate(self, args):
+        return ""
 
-    @abstractmethod
-    def is_running(self):
-        """check if symbol is running"""
-        pass
+    def exec(self, args, ctx):
+        return args[0][::-1]
+
+    def is_aggregate(self):
+        return False
 
 
-def parse_context(ctrl):
-    if ctrl['meta']['ruleId'] == "" or ctrl['meta']['opId'] == "":
-        raise ('invalid arg: ', ctrl, 'ruleId and opId are required')
-    return contextimpl.ContextImpl(ctrl['meta'])
+revertIns = RevertFunc()

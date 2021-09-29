@@ -25,29 +25,26 @@
 #  limitations under the License.
 from abc import abstractmethod
 
-from ekuiper.runtime import contextimpl
 
-
-class SymbolRuntime:
-    """class to model the running symbol of source/sink/function"""
+class Sink(object):
+    """abstract class for eKuiper sink plugin"""
 
     @abstractmethod
-    def run(self):
-        """start to run the symbol"""
+    def configure(self, conf):
+        """configure with conf map and raise error if any"""
         pass
 
     @abstractmethod
-    def stop(self):
-        """stop the symbol"""
+    def open(self, ctx):
+        """open connection and wait to receive data"""
         pass
 
     @abstractmethod
-    def is_running(self):
-        """check if symbol is running"""
+    def collect(self, ctx, data):
+        """callback to deal with received data"""
         pass
 
-
-def parse_context(ctrl):
-    if ctrl['meta']['ruleId'] == "" or ctrl['meta']['opId'] == "":
-        raise ('invalid arg: ', ctrl, 'ruleId and opId are required')
-    return contextimpl.ContextImpl(ctrl['meta'])
+    @abstractmethod
+    def close(self, ctx):
+        """stop running and clean up"""
+        pass

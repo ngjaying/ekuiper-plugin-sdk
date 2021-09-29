@@ -23,31 +23,25 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from abc import abstractmethod
+import traceback
 
-from ekuiper.runtime import contextimpl
-
-
-class SymbolRuntime:
-    """class to model the running symbol of source/sink/function"""
-
-    @abstractmethod
-    def run(self):
-        """start to run the symbol"""
-        pass
-
-    @abstractmethod
-    def stop(self):
-        """stop the symbol"""
-        pass
-
-    @abstractmethod
-    def is_running(self):
-        """check if symbol is running"""
-        pass
+runtimes = {}
 
 
-def parse_context(ctrl):
-    if ctrl['meta']['ruleId'] == "" or ctrl['meta']['opId'] == "":
-        raise ('invalid arg: ', ctrl, 'ruleId and opId are required')
-    return contextimpl.ContextImpl(ctrl['meta'])
+def has(name):
+    return name in runtimes
+
+
+def get(name):
+    return runtimes[name]
+
+
+def set(name, r):
+    runtimes[name] = r
+
+
+def delete(name):
+    try:
+        del runtimes[name]
+    except:
+        print(traceback.format_exc())

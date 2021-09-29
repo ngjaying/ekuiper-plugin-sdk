@@ -26,37 +26,35 @@
 import traceback
 
 from ekuiper.runtime import reg
-from ekuiper.runtime.connection import SourceChannel
-from ekuiper.runtime.symbol import parse_context, SymbolRuntime
+from ekuiper.runtime.connection import SinkChannel
+from ekuiper.runtime.symbol import SymbolRuntime, parse_context
 
 
-class SourceRuntime(SymbolRuntime):
+class SinkRuntime(SymbolRuntime):
 
     def __init__(self, ctrl, s):
         ctx = parse_context(ctrl)
-        ds = ""
         config = {}
-        if 'datasource' in ctrl:
-            ds = ctrl['datasource']
         if 'config' in ctrl:
             config = ctrl['config']
-        s.configure(ds, config)
-        ch = SourceChannel(ctrl['meta'])
-        ctx.set_emitter(ch)
-        key = "{}_{}_{}_{}".format(ctrl['meta']['ruleId'], ctrl['meta']['opId'], ctrl['meta']['instanceId'],
-                                   ctrl['symbolName'])
+        s.configure(config)
+        ch = SinkChannel(ctrl['meta'])
         self.s = s
         self.ctx = ctx
         self.ch = ch
         self.running = False
-        self.key = key
+        self.key = "{}_{}_{}_{}".format(ctrl['meta']['ruleId'], ctrl['meta']['opId'], ctrl['meta']['instanceId'],
+                                        ctrl['symbolName'])
 
     def run(self):
-        print('start running source')
-        self.running = True
-        reg.set(self.key, self)
+        print('start running sink')
         try:
             self.s.open(self.ctx)
+            self.running = True
+            reg.set(self.key, self)
+            while True:
+                msg = self.ch.recv()
+                self.s.collect(self.ctx, msg)
         except:
             """two occasions: normal stop will close socket to raise an error OR stopped by unexpected error"""
             if self.running:

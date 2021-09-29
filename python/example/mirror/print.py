@@ -23,31 +23,22 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from abc import abstractmethod
-
-from ekuiper.runtime import contextimpl
+from ekuiper.sink import Sink
 
 
-class SymbolRuntime:
-    """class to model the running symbol of source/sink/function"""
+class PrintSink(Sink):
 
-    @abstractmethod
-    def run(self):
-        """start to run the symbol"""
+    def __init__(self):
         pass
 
-    @abstractmethod
-    def stop(self):
-        """stop the symbol"""
-        pass
+    def configure(self, conf):
+        print('configure print sink')
 
-    @abstractmethod
-    def is_running(self):
-        """check if symbol is running"""
-        pass
+    def open(self, ctx):
+        print('open print sink: ', ctx)
 
+    def collect(self, ctx, data):
+        print('receive: ', data)
 
-def parse_context(ctrl):
-    if ctrl['meta']['ruleId'] == "" or ctrl['meta']['opId'] == "":
-        raise ('invalid arg: ', ctrl, 'ruleId and opId are required')
-    return contextimpl.ContextImpl(ctrl['meta'])
+    def close(self, ctx):
+        print("closing print sink")
